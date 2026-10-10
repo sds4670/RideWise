@@ -29,6 +29,12 @@ class Session:
 def assert_can_access_customer(session: Session, target_customer_id: str) -> None:
     """Raise PermissionError if the session may not access target_customer_id.
 
-    A CUSTOMER may only access their own id. An AGENT may access any.
+    A CUSTOMER may only access their own id. An AGENT may access any. The DB
+    views already enforce this; this is a defence-in-depth check for any code
+    path that resolves a customer_id outside a view.
     """
-    raise NotImplementedError
+    if session.role is Role.AGENT:
+        return
+    if session.role is Role.CUSTOMER and session.customer_id == target_customer_id:
+        return
+    raise PermissionError("Access to this customer's data is not permitted.")
