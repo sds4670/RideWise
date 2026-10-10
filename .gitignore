@@ -1,0 +1,22 @@
+# Secrets / env
+.env
+.streamlit/secrets.toml
+sample_open_ai_wrapper.py
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Local data (copy provided DB and policy PDFs into data/ — see .env.example)
+data/
+
+# Claude Code local config
+.claude/
+
+# Misc
+*.log
+.DS_Store
+.dist/
