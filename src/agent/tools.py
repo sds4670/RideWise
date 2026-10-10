@@ -112,13 +112,13 @@ def get_damage(ctx: ToolContext, booking_id: str) -> dict:
         return _not_found(booking_id)
     chargeable = engine.load_policy()["damage"]["chargeable_statuses"]
     rows = ctx.conn.execute(
-        "SELECT report_id, damage_category, severity, assessed_cost, claim_status "
-        "FROM damage_reports WHERE booking_id = ?", (booking_id,)
+        "SELECT report_id, damage_category, severity, description, assessed_cost, "
+        "claim_status FROM damage_reports WHERE booking_id = ?", (booking_id,)
     ).fetchall()
     return {"found": True, "reports": [
         {"report_id": r["report_id"], "category": r["damage_category"],
-         "severity": r["severity"], "assessed_cost": r["assessed_cost"],
-         "claim_status": r["claim_status"],
+         "severity": r["severity"], "description": r["description"],
+         "assessed_cost": r["assessed_cost"], "claim_status": r["claim_status"],
          "billable": r["claim_status"] in chargeable}
         for r in rows
     ]}

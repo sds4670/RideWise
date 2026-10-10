@@ -55,10 +55,7 @@ if prompt:
     if session.role is Role.CUSTOMER and not session.customer_id:
         reply = "Please enter your Customer ID (for example CUST0001) in the sidebar."
     else:
-        try:
-            reply = run_turn(session, st.session_state["history"], prompt)
-        except NotImplementedError:
-            reply = "The assistant is not wired up yet (agent loop pending). UI is working."
+        reply = run_turn(session, st.session_state["history"], prompt)["answer"]
 
     st.session_state["history"].append({"role": "assistant", "content": reply})
     with st.chat_message("assistant"):
