@@ -8,12 +8,15 @@ Responsibilities:
 """
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass
 
 from openai import OpenAI
 
 from src.config import LLMConfig, load_llm_config
+
+logger = logging.getLogger("ridewise.llm")
 
 REQUEST_TIMEOUT_S = 30.0
 MAX_RETRIES = 2            # retries on top of the first attempt
@@ -72,4 +75,5 @@ def chat_safe(messages: list[dict], *, tools: list[dict] | None = None,
         text = resp.choices[0].message.content or ""
         return LLMResult(ok=True, message=text, raw=resp)
     except Exception as exc:  # noqa: BLE001
+        logger.exception("LLM call failed; using fallback message")
         return LLMResult(ok=False, message=FALLBACK_MESSAGE, error=str(exc))

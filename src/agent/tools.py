@@ -197,12 +197,20 @@ def quote_battery_fee(ctx: ToolContext, booking_id: str) -> dict:
 
 
 def run_sql(ctx: ToolContext, sql: str) -> dict:
-    """Run one validated read-only SELECT against the role-scoped views."""
+    """Run one validated read-only SELECT against the role-scoped views.
+
+    Execution errors (e.g. a wrong column name in model-written SQL) are returned
+    as a structured error so the model can correct itself, rather than raising
+    and failing the whole turn.
+    """
     try:
         rows = run_query(ctx.conn, sql)
         return {"ok": True, "row_count": len(rows), "rows": rows, "sql": sql}
     except (SQLValidationError, TimeoutError) as exc:
         return {"ok": False, "error": str(exc), "sql": sql}
+    except sqlite3.OperationalError as exc:
+        return {"ok": False, "error": f"SQL error: {exc}. Check table/column "
+                f"names against the schema and retry.", "sql": sql}
 
 
 # --- registry ------------------------------------------------------------

@@ -35,6 +35,27 @@ STATUS_GLOSSARY = (
     "customer (OPEN/DISPUTED/WAIVED are not)."
 )
 
+DB_SCHEMA = (
+    "Database schema (SQLite). When using run_sql, use these EXACT table and "
+    "column names:\n"
+    "customers(customer_id, full_name, phone, email, city, city_norm, "
+    "date_of_birth, driving_license_no, kyc_status, customer_tier, created_at)\n"
+    "vehicles(vehicle_id, registration_no, vehicle_type, model, hub_name, "
+    "hourly_rate, daily_rate, battery_capacity_kwh, status, commissioned_on)\n"
+    "bookings(booking_id, customer_id, vehicle_id, booked_at, scheduled_start, "
+    "scheduled_end, actual_return_at, cancelled_at, booking_status, "
+    "return_battery_pct)\n"
+    "payments(payment_id, booking_id, payment_type, amount, gst_amount, "
+    "payment_method, payment_status, transaction_ref, paid_at, remarks)\n"
+    "damage_reports(report_id, booking_id, vehicle_id, reported_by, "
+    "damage_category, severity, description, assessed_cost, claim_status, "
+    "reported_at)\n"
+    "Notes: booking state is bookings.booking_status (not 'status'); the pickup "
+    "hub is vehicles.hub_name - join bookings.vehicle_id = vehicles.vehicle_id; "
+    "scheduled times are scheduled_start/scheduled_end. All timestamps are UTC "
+    "text. Only these five views are queryable and sessions are auto-scoped."
+)
+
 DIRTY_DATA_NOTES = (
     "Data notes: customers.city is dirty (Bengaluru/Bangalore/BLR/trailing "
     "spaces) - use the city_norm column when filtering or grouping by city. "
@@ -103,7 +124,8 @@ def system_prompt(role: Role) -> str:
         "You are RideWise Assist, a helpful assistant for RideWise (two-wheeler "
         "and EV rental, Bengaluru).\n"
         f"Current time: {now_ist}.\n\n"
-        f"{scope}\n\n{STATUS_GLOSSARY}\n\n{DIRTY_DATA_NOTES}\n\n{_COMMON_RULES}\n\n"
+        f"{scope}\n\n{STATUS_GLOSSARY}\n\n{DB_SCHEMA}\n\n{DIRTY_DATA_NOTES}\n\n"
+        f"{_COMMON_RULES}\n\n"
         "===== POLICY DOCUMENTS (authoritative; cite clause IDs like RW-POL-02 "
         "cl.1.1) =====\n"
     )

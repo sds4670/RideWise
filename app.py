@@ -75,9 +75,13 @@ def _render_sources(sources: dict) -> None:
     tool_calls = sources.get("tool_calls") or []
     sqls = sources.get("sql") or []
     clauses = sources.get("policy_clauses") or []
-    if not (tool_calls or sqls or clauses):
+    error = sources.get("error") if os.environ.get("DEBUG_ERRORS") == "1" else None
+    if not (tool_calls or sqls or clauses or error):
         return
     with st.expander("How I got this"):
+        if error:
+            st.caption("Debug (DEBUG_ERRORS=1)")
+            st.markdown(f"- Error: `{error.get('type')}: {error.get('message')}`")
         if tool_calls:
             st.caption("Tools")
             for c in tool_calls:
