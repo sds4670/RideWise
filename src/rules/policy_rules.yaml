@@ -1,0 +1,61 @@
+# RideWise policy constants. Single source of truth for every number the rules
+# engine uses. Each value cites the policy document and clause it comes from, so
+# an answer can always be traced back to a document. Verified against the PDFs in
+# data/ on 2026-10-10.
+#
+# Docs:
+#   RW-POL-01 Rental Agreement & Terms (v3.0)
+#   RW-POL-02 Cancellation & Refund Policy v1
+#   RW-POL-03 Cancellation & Refund Policy v2
+#   RW-POL-04 Late Return & Damage Penalty Schedule (v2.1)
+#   RW-POL-05 EV User Guide & FAQ (v1.4)
+
+gst_rate: 0.18            # RW-POL-01 cl.4.3 — 18% on rental, penalties and fees. Deposit is exempt (cl.5.2).
+
+rental:
+  min_hours: 2            # RW-POL-01 cl.3.2 — whole hours, minimum 2h.
+  hours_per_day: 24       # RW-POL-01 cl.4.1 — a "day" is a 24-hour block.
+  # charge = full_days*daily_rate + min(remaining_hours*hourly_rate, daily_rate)  (RW-POL-01 cl.4.1)
+
+deposit:
+  # RW-POL-01 cl.5.1 — refundable, no GST (cl.5.2). Returns not in DB; gateway handles (cl.5.3).
+  BIKE: {amount: 1000, min_hours: 0}        # any rental
+  EV_BIKE: {amount: 1000, min_hours: 0}     # any rental
+  SCOOTER: {amount: 500, min_hours: 24}     # only rentals >= 24h
+  EV_SCOOTER: {amount: 500, min_hours: 24}  # only rentals >= 24h
+
+refund:
+  # Version chosen by bookings.booked_at converted to IST (RW-POL-02 scope / RW-POL-03 scope).
+  cutoff_ist: "2026-07-01 00:00:00"   # before -> v1, on/after -> v2. (= 2026-06-30 18:30:00 UTC)
+  # Hours measured from cancelled_at to scheduled_start. Percent applied to rental actually paid;
+  # GST refunded in the same proportion.
+  v1:  # RW-POL-02 cl.1.1 — bookings made before cutoff.
+    - {min_hours_before: 24, percent: 100}
+    - {min_hours_before: 6,  percent: 50}
+    - {min_hours_before: 0,  percent: 0}
+  v2:  # RW-POL-03 Annexure 1 — bookings made on/after cutoff.
+    - {min_hours_before: 48, percent: 100}
+    - {min_hours_before: 12, percent: 75}
+    - {min_hours_before: 2,  percent: 25}
+    - {min_hours_before: 0,  percent: 0}
+  cancelled_by_ridewise_percent: 100  # RW-POL-02/03 cl.2 — always 100% (booking_status CNL_S).
+  no_show_percent: 0                   # RW-POL-01 cl.7.2 / refund cl.3 — NSH never refunded.
+
+late_fee:
+  # RW-POL-04 cl.1.2 — each late hour or part-hour = 1.5 x hourly_rate, + GST.
+  # Lateness measured scheduled_end -> actual_return_at (cl.1.1).
+  multiplier: 1.5
+  grace_minutes_by_tier:   # RW-POL-04 Annexure A. Grace does NOT reduce charged lateness once exceeded.
+    STANDARD: 0
+    SILVER: 0
+    GOLD: 30               # <=30 min late -> no fee; >30 min -> full lateness charged from first minute.
+
+ev_battery_fee:
+  # RW-POL-04 cl.2 / RW-POL-05 Fig.2 — below 10% -> flat fee + GST; exactly 10% or above -> no fee.
+  # Separate from late fee; both can apply to the same rental (RW-POL-05 FAQ).
+  threshold_pct: 10
+  flat_fee: 150
+
+damage:
+  # RW-POL-04 cl.3.1 — customer is charged only when claim_status is CHARGED (assessed_cost + GST).
+  chargeable_statuses: [CHARGED]
