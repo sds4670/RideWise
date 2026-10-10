@@ -11,7 +11,12 @@ __pycache__/
 .pytest_cache/
 
 # Local data (copy provided DB and policy PDFs into data/ — see .env.example)
+# The provided dataset must never be committed, wherever it sits.
 data/
+ridewise.db
+ridewise_data.xlsx
+*.db
+*.xlsx
 
 # Generated run outputs
 outputs/
