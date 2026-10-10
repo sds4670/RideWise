@@ -37,6 +37,23 @@ def gst(amount: float) -> dict:
     }
 
 
+# --- Booked duration -----------------------------------------------------
+
+def booked_hours(scheduled_start_utc: str, scheduled_end_utc: str) -> dict:
+    """Whole booked hours between two timestamps.
+
+    Rentals are booked in whole hours (RW-POL-01 cl.3.2). If the span is not a
+    whole number of hours, it is rounded up and ``whole`` is set False so the
+    caller can flag the odd data rather than silently hide it.
+    """
+    start = parse_db_utc(scheduled_start_utc)
+    end = parse_db_utc(scheduled_end_utc)
+    raw = (end - start).total_seconds() / 3600.0
+    whole = float(raw).is_integer()
+    hours = int(raw) if whole else math.ceil(raw)
+    return {"hours": hours, "raw_hours": round(raw, 4), "whole": whole}
+
+
 # --- Rental charge -------------------------------------------------------
 
 def rental_charge(hours: int, hourly_rate: float, daily_rate: float) -> dict:
@@ -105,15 +122,16 @@ def battery_fee(return_battery_pct: int | None) -> dict:
     flat = _P["ev_battery_fee"]["flat_fee"]
     sources = ["RW-POL-04 cl.2"]
     if return_battery_pct is None:
-        return {"fee": 0.0,
-                "steps": ["No EV return battery level recorded; no battery fee."],
+        return {"status": "unknown", "fee": None,
+                "steps": ["Return battery level is not recorded, so the battery "
+                          "fee cannot be determined. Say so rather than assuming."],
                 "sources": sources}
     if return_battery_pct < threshold:
-        return {"fee": _money(flat),
+        return {"status": "applies", "fee": _money(flat),
                 "steps": [f"Return battery {return_battery_pct}% is below "
                           f"{threshold}%: flat fee {flat} (ex-GST)."],
                 "sources": sources}
-    return {"fee": 0.0,
+    return {"status": "none", "fee": 0.0,
             "steps": [f"Return battery {return_battery_pct}% is {threshold}% or "
                       f"above: no battery fee."],
             "sources": sources}

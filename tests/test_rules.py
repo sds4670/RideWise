@@ -50,9 +50,29 @@ def test_gold_grace_exceeded_charges_full_lateness():
 
 # --- EV battery fee (RW-POL-04 cl.2) -------------------------------------
 
-@pytest.mark.parametrize("pct,expected", [(9, 150), (10, 0), (50, 0), (None, 0)])
-def test_battery_fee(pct, expected):
-    assert battery_fee(pct)["fee"] == expected
+@pytest.mark.parametrize("pct,expected_fee", [(9, 150), (10, 0), (50, 0)])
+def test_battery_fee_known(pct, expected_fee):
+    r = battery_fee(pct)
+    assert r["fee"] == expected_fee
+    assert r["status"] == ("applies" if expected_fee else "none")
+
+
+def test_battery_fee_exactly_10_no_fee():
+    r = battery_fee(10)
+    assert r["status"] == "none" and r["fee"] == 0.0
+
+
+def test_battery_fee_unknown_when_missing():
+    r = battery_fee(None)
+    assert r["status"] == "unknown" and r["fee"] is None
+
+
+def test_booked_hours_whole_and_rounds_up():
+    from src.rules.engine import booked_hours
+    whole = booked_hours("2026-09-11 04:30:00", "2026-09-11 10:30:00")
+    assert whole == {"hours": 6, "raw_hours": 6.0, "whole": True}
+    partial = booked_hours("2026-09-11 04:30:00", "2026-09-11 10:50:00")
+    assert partial["hours"] == 7 and partial["whole"] is False
 
 
 # --- Deposit (RW-POL-01 cl.5.1) ------------------------------------------
