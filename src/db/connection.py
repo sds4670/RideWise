@@ -50,11 +50,19 @@ def _safe_customer_id(customer_id: str | None) -> str:
     return customer_id
 
 
+# Canonical city from the dirty source values (bangalore/bengaluru/blr ->
+# 'Bengaluru'; everything else trimmed). Raw city column is always kept too.
+_CITY_NORM_SQL = (
+    "CASE WHEN lower(trim(city)) IN ('bangalore', 'bengaluru', 'blr') "
+    "THEN 'Bengaluru' ELSE trim(city) END AS city_norm"
+)
+
+
 def _customer_view_ddl(cid: str) -> list[str]:
     """Views filtered to a single customer (CUSTOMER role)."""
     return [
         f"CREATE TEMP VIEW customers AS "
-        f"SELECT * FROM main.customers WHERE customer_id = '{cid}'",
+        f"SELECT *, {_CITY_NORM_SQL} FROM main.customers WHERE customer_id = '{cid}'",
         f"CREATE TEMP VIEW bookings AS "
         f"SELECT * FROM main.bookings WHERE customer_id = '{cid}'",
         f"CREATE TEMP VIEW payments AS "
@@ -79,7 +87,8 @@ def _agent_view_ddl() -> list[str]:
         "city, "
         "'[masked]' AS date_of_birth, "
         "'[masked]' AS driving_license_no, "
-        "kyc_status, customer_tier, created_at "
+        "kyc_status, customer_tier, created_at, "
+        f"{_CITY_NORM_SQL} "
         "FROM main.customers"
     )
     return [

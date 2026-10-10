@@ -78,6 +78,29 @@ def test_agent_sees_all_customers(agent_conn):
     assert n > 1
 
 
+# --- city normalisation --------------------------------------------------
+
+def test_city_norm_maps_bengaluru_variants(agent_conn):
+    rows = run_query(
+        agent_conn,
+        "SELECT DISTINCT city, city_norm FROM customers "
+        "WHERE lower(trim(city)) IN ('bangalore', 'bengaluru', 'blr')",
+    )
+    assert rows, "expected some Bengaluru-variant rows in the data"
+    assert all(r["city_norm"] == "Bengaluru" for r in rows)
+
+
+def test_city_norm_keeps_raw_and_trims_others(agent_conn):
+    rows = run_query(
+        agent_conn,
+        "SELECT DISTINCT city, city_norm FROM customers "
+        "WHERE lower(trim(city)) NOT IN ('bangalore', 'bengaluru', 'blr')",
+    )
+    for r in rows:
+        assert r["city_norm"] == r["city"].strip()
+        assert r["city_norm"] != ""
+
+
 # --- validator -----------------------------------------------------------
 
 @pytest.mark.parametrize(
