@@ -196,6 +196,23 @@ def quote_battery_fee(ctx: ToolContext, booking_id: str) -> dict:
             "sources": policy["sources"]}
 
 
+def search_policy(ctx: ToolContext, query: str, booking_id: str | None = None,
+                  topic: str | None = None) -> dict:
+    """Retrieve the relevant policy clauses for a question.
+
+    If booking_id is given, its booked_at is used to decide which refund policy
+    version applies (labelled in each result's applicability). Scope comes from
+    the session; booking_id is only used to read booked_at within scope.
+    """
+    booked_at = None
+    if booking_id:
+        b = _booking(ctx.conn, booking_id)
+        if b is not None:
+            booked_at = b["booked_at"]
+    from src.policy.retriever import search
+    return search(query, booked_at=booked_at, topic=topic)
+
+
 def run_sql(ctx: ToolContext, sql: str) -> dict:
     """Run one validated read-only SELECT against the role-scoped views.
 
@@ -216,7 +233,8 @@ def run_sql(ctx: ToolContext, sql: str) -> dict:
 # --- registry ------------------------------------------------------------
 
 _COMMON = ["get_booking", "get_payments_summary", "get_damage", "quote_rental",
-           "quote_refund", "quote_late_fee", "quote_battery_fee", "run_sql"]
+           "quote_refund", "quote_late_fee", "quote_battery_fee", "search_policy",
+           "run_sql"]
 _CUSTOMER_ONLY = ["list_my_bookings"]
 
 _CALLABLES = {
@@ -224,7 +242,7 @@ _CALLABLES = {
     "get_payments_summary": get_payments_summary, "get_damage": get_damage,
     "quote_rental": quote_rental, "quote_refund": quote_refund,
     "quote_late_fee": quote_late_fee, "quote_battery_fee": quote_battery_fee,
-    "run_sql": run_sql,
+    "search_policy": search_policy, "run_sql": run_sql,
 }
 
 _BID = {"booking_id": {"type": "string", "description": "Booking id, e.g. B-0001"}}
@@ -248,6 +266,18 @@ _SCHEMAS = {
     "quote_battery_fee": _schema("quote_battery_fee", "Compute EV battery fee (policy) vs recorded.", _BID, ["booking_id"]),
     "run_sql": _schema("run_sql", "Run one read-only SELECT over the allowed views.",
                        {"sql": {"type": "string", "description": "A single SELECT statement."}}, ["sql"]),
+    "search_policy": _schema(
+        "search_policy",
+        "Retrieve policy clauses to answer any policy/eligibility/rules question "
+        "(refunds, cancellation, late fees, grace, deposits, KYC, damage, GST, "
+        "battery, charging). Use this instead of stating policy from memory. Not "
+        "for computing amounts (use the quote_* tools) or reading booking data.",
+        {"query": {"type": "string", "description": "The policy question."},
+         "booking_id": {"type": "string", "description": "Optional booking to "
+                        "decide which refund version applies."},
+         "topic": {"type": "string", "description": "Optional topic hint, e.g. "
+                   "refund, late_fee, deposit, kyc, battery, damage."}},
+        ["query"]),
 }
 
 

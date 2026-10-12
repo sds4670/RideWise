@@ -36,11 +36,21 @@ BM25_PATH = INDEX_DIR / "bm25.pkl"
 EMB_PATH = INDEX_DIR / "embeddings.npy"
 META_PATH = INDEX_DIR / "meta.json"
 
+# Bump when chunking or tokenisation changes, so the index auto-rebuilds even
+# though the source documents are unchanged.
+INDEX_VERSION = "2"
+
 _TOKEN = re.compile(r"[a-z0-9]+")
+_STOPWORDS = {
+    "a", "an", "the", "is", "are", "was", "were", "be", "been", "of", "to",
+    "in", "on", "for", "and", "or", "if", "my", "i", "you", "how", "what",
+    "when", "which", "do", "does", "did", "can", "could", "will", "would",
+    "with", "at", "by", "this", "that", "it", "me", "we", "as", "from", "about",
+}
 
 
 def tokenize(text: str) -> list[str]:
-    return _TOKEN.findall(text.lower())
+    return [t for t in _TOKEN.findall(text.lower()) if t not in _STOPWORDS]
 
 
 def embed_model() -> str | None:
@@ -52,6 +62,7 @@ def embed_model() -> str | None:
 
 def _source_hash() -> str:
     h = hashlib.sha256()
+    h.update(INDEX_VERSION.encode())
     for fname in sorted(DOC_META):
         p = DATA_DIR / fname
         if p.exists():
