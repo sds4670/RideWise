@@ -21,6 +21,9 @@ ridewise_data.xlsx
 # Generated run outputs
 outputs/
 
+# Generated policy index (rebuilt from data/ on first run)
+index/
+
 # Claude Code local config
 .claude/
 
