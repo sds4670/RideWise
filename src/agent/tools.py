@@ -159,9 +159,17 @@ def quote_refund(ctx: ToolContext, booking_id: str) -> dict:
     if projected:
         policy["steps"].insert(0, "No cancellation on record; projecting as if "
                                   "cancelled now (current time).")
+    # Attach the retrieved refund clause text (version-aware) for sources.
+    from src.policy.retriever import search
+    pol = search("refund on cancellation before pickup", booked_at=b["booked_at"])
+    policy_chunks = [
+        {"chunk_id": r["chunk_id"], "doc_id": r["doc_id"], "clause": r["clause"],
+         "applicability": r["applicability"], "text": r["text"]}
+        for r in pol["results"]
+    ]
     return {"found": True, "projected": projected, "policy_says": policy,
             "recorded": repo.recorded_refunds(ctx.conn, booking_id),
-            "sources": policy["sources"]}
+            "sources": policy["sources"], "policy_chunks": policy_chunks}
 
 
 def quote_late_fee(ctx: ToolContext, booking_id: str) -> dict:
