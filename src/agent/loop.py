@@ -76,12 +76,23 @@ def _with_error(sources: dict, exc: Exception) -> dict:
 
 def _collect_source(sources_acc: dict, name: str, args: dict, result) -> None:
     sources_acc["tool_calls"].append({"tool": name, "args": args})
+    sources_acc.setdefault("policy_chunks", [])
     if isinstance(result, dict):
         if result.get("sql"):
             sources_acc["sql"].append(result["sql"])
         for clause in result.get("sources", []) or []:
             if clause not in sources_acc["policy_clauses"]:
                 sources_acc["policy_clauses"].append(clause)
+        # Retrieved chunks from search_policy ("results") or quote_refund.
+        for r in (result.get("results") or result.get("policy_chunks") or []):
+            if not isinstance(r, dict) or not r.get("doc_id"):
+                continue
+            cid = r.get("chunk_id") or f"{r['doc_id']}#{r.get('clause')}"
+            label = f"{r['doc_id']} {r.get('clause')}"
+            if label not in sources_acc["policy_clauses"]:
+                sources_acc["policy_clauses"].append(label)
+            if cid not in sources_acc["policy_chunks"]:
+                sources_acc["policy_chunks"].append(cid)
 
 
 def run_turn(
@@ -124,7 +135,7 @@ def run_turn(
             runner = _run_json if mode == "json" else _run_native
             return runner(chat_fn, messages, schemas, dispatch, sources, max_tool_steps)
 
-        sources = {"tool_calls": [], "sql": [], "policy_clauses": []}
+        sources = {"tool_calls": [], "sql": [], "policy_clauses": [], "policy_chunks": []}
         try:
             answer = _run(tool_mode, sources)
         except Exception as exc:  # noqa: BLE001 - never surface a raw error to the UI
@@ -133,7 +144,7 @@ def run_turn(
             if tool_mode == "native" and _is_tool_support_error(exc):
                 logger.warning("native tool calling unsupported; retrying in json mode")
                 sources = {"tool_calls": [], "sql": [], "policy_clauses": [],
-                           "auto_json_fallback": True}
+                           "policy_chunks": [], "auto_json_fallback": True}
                 try:
                     answer = _run("json", sources)
                 except Exception as exc2:  # noqa: BLE001

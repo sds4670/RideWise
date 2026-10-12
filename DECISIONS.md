@@ -13,7 +13,7 @@ Quote tools return the computed amount and the matching database rows as differe
 
 ## 2. Alternatives considered and rejected
 
-- **Vector RAG over the policies.** The pack is a few pages and fits in the prompt. Retrieval can miss a version-scope clause or an annexure and give a wrong refund. Two key tables (v2 refund schedule, tier grace) are images inside the PDFs, which a text pipeline would skip; they were transcribed by hand. The version choice depends on a date, not similarity.
+- **Naive vector RAG over the policies.** Fixed-size vector chunks can split a table across rows, miss a version-scope clause or an annexure, and give a wrong refund; and the version choice depends on a date, not similarity. We kept the inline-prompt mode (`RAG_MODE=full`) and added a *structure-aware* RAG instead (see section 5), where clauses and tables are whole and the version is chosen by code.
 - **Free LLM-written SQL only.** Unstable on joins and unsafe. Curated tools handle common questions; a validated `run_sql` covers unseen analytic ones.
 - **Fixed query templates only.** Safe but breaks on unseen questions.
 - **Security by prompt only.** Can be jailbroken.
@@ -41,3 +41,17 @@ Quote tools return the computed amount and the matching database rows as differe
 - Response caching and prefix caching to cut latency and cost.
 - An escalation flow to a human agent for disputes and low-confidence answers.
 - Automated detection of mismatches between policy and recorded charges for the support team.
+
+## 5. Policy retrieval (RAG) design
+
+Added as `RAG_MODE=rag` (default); `RAG_MODE=full` restores the inline-prompt behaviour. The whole feature is behind the existing `search_policy` tool, so the rules engine, scoped DB views, guards and other tools are unchanged.
+
+**Why structure-aware clause chunking, not fixed-size windows.** One chunk is one numbered clause, heading section, table or FAQ Q&A, with no overlap. Tables are never split by row and a clause keeps its worked example, because the questions here are about exact slabs and thresholds: a half-table or a clause separated from its example gives a wrong number. Each chunk begins with a context header (doc, version, effective date, applicability, clause) so it is self-contained when retrieved. The two scanned annexures (v2 refund schedule, tier grace) are images with no extractable text, so they come from the hand-transcribed `annexes.md` and are treated as authoritative for those pages. The inventory is written to `docs/CHUNKS.md` for review.
+
+**Why code picks the version, never similarity.** Refund/cancellation/no-show queries always return both v1 (RW-POL-02) and v2 (RW-POL-03) plus each scope clause, so a retrieval miss can never drop a version. When a booking is in context, `engine.refund_version` (the same IST cutoff, 2026-06-30 18:30 UTC, used for actual quotes) labels the applicable version "APPLIES to this booking" and the other "SUPERSEDED, shown for reference". With no booking, both are labelled with their date condition and the model states both or asks. Late-fee/grace queries always include Annexure A; deposit queries include RW-POL-01 clause 5. This keeps the date-driven logic in one place and out of the similarity ranking.
+
+**Why BM25 (with optional embeddings), not a mandatory embedding model.** The corpus is tiny, the vocabulary is shared between question and clause, and the brief forbids downloading local models or adding heavy dependencies. BM25 (`rank_bm25`) needs none of that and builds in well under a second. Embeddings are fused in via reciprocal rank fusion *only* if the endpoint exposes an embedding deployment (`LLM_EMBED_MODEL`); otherwise retrieval is BM25 plus metadata filtering. The index lives in `index/` (gitignored) and auto-rebuilds when a hash of the sources or the chunker version changes; it never writes to `data/` or `ridewise.db`.
+
+**Measured.** Retrieval hit-rate is 21 of 22 policy questions (95%) with an expected clause in the top 4 (`tests/test_retrieval.py`). The one miss is "cancellation by RideWise": the forced v1/v2 refund-slab chunks crowd clause 2 out of the top 4 for that phrasing.
+
+**Trade-offs.** BM25 can miss heavily paraphrased questions that share no words with the clause; embeddings would help but depend on an endpoint model. Structure-aware chunking is tuned to these five documents' numbering and would need adjusting for a differently formatted pack. Forcing both refund versions and family-specific chunks improves correctness but reduces slot space for other relevant clauses (the cause of the single hit-rate miss).

@@ -116,8 +116,36 @@ _AGENT_SCOPE = (
 )
 
 
+POLICY_INDEX_SUMMARY = (
+    "===== POLICY INDEX (use search_policy to read the actual clauses) =====\n"
+    "RW-POL-01 Rental Agreement and Terms (v3.0, effective 2025-01-01)\n"
+    "RW-POL-02 Cancellation and Refund Policy v1 (effective 2025-01-01)\n"
+    "RW-POL-03 Cancellation and Refund Policy v2 (effective 2026-07-01)\n"
+    "RW-POL-04 Late Return and Damage Penalty Schedule (v2.1, effective 2025-01-01)\n"
+    "RW-POL-05 EV User Guide and FAQ (v1.4)\n"
+    "Refund version rule: a booking made before 2026-07-01 00:00 IST follows v1 "
+    "(RW-POL-02); made on or after that follows v2 (RW-POL-03). The tool labels "
+    "which version applies when given a booking."
+)
+
+_RAG_RULES = (
+    "Policy retrieval rules:\n"
+    "- For ANY policy, eligibility or rules question, call search_policy; never "
+    "state policy from memory.\n"
+    "- Cite doc_id and clause for every policy statement you make.\n"
+    "- Any rupee amount still comes only from the quote_* tools, not from "
+    "retrieved text.\n"
+    "- If search_policy returns 'no relevant policy found', say 'not in policy'."
+)
+
+
 def system_prompt(role: Role) -> str:
-    """Build the full system prompt for the given role."""
+    """Build the system prompt for the given role.
+
+    RAG_MODE=rag (default): a short policy index + retrieval rules; the model
+    reads clauses via search_policy. RAG_MODE=full: the entire policy text is
+    embedded in the prompt (the original behaviour).
+    """
     scope = _CUSTOMER_SCOPE if role is Role.CUSTOMER else _AGENT_SCOPE
     now_ist = format_ist(now_utc().strftime("%Y-%m-%d %H:%M:%S"))
     header = (
@@ -126,7 +154,13 @@ def system_prompt(role: Role) -> str:
         f"Current time: {now_ist}.\n\n"
         f"{scope}\n\n{STATUS_GLOSSARY}\n\n{DB_SCHEMA}\n\n{DIRTY_DATA_NOTES}\n\n"
         f"{_COMMON_RULES}\n\n"
-        "===== POLICY DOCUMENTS (authoritative; cite clause IDs like RW-POL-02 "
-        "cl.1.1) =====\n"
     )
-    return header + load_policy_text()
+    if _rag_mode() == "full":
+        return (header + "===== POLICY DOCUMENTS (authoritative; cite clause IDs "
+                "like RW-POL-02 cl.1.1) =====\n" + load_policy_text())
+    return header + POLICY_INDEX_SUMMARY + "\n\n" + _RAG_RULES
+
+
+def _rag_mode() -> str:
+    import os
+    return (os.environ.get("RAG_MODE", "rag").strip().lower() or "rag")
